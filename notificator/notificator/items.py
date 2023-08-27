@@ -1,12 +1,11 @@
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
-
 import scrapy
+from scrapy import Field
 
 
-class NotificatorItem(scrapy.Item):
-    # define the fields for your item here like:
-    # name = scrapy.Field()
-    pass
+class RoomItem(scrapy.Item):
+    id = Field()
+    rate = Field(serializer=float)
+    reviews = Field(serializer=int)
+    price = Field()
+    checkin = Field()
+    checkout = Field()
