@@ -9,6 +9,7 @@
 
 BOT_NAME = "notificator"
 
+# DOWNLOAD_DELAY = 4
 LOG_LEVEL = "INFO"
 
 SPIDER_MODULES = ["notificator.spiders"]

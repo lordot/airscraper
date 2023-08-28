@@ -1,5 +1,6 @@
 import json
 import re
+import urllib.parse
 from typing import Generator
 
 import scrapy
@@ -10,19 +11,43 @@ from notificator.items import RoomItem
 
 
 class OffersSpider(scrapy.Spider):
+    """
+    Each attribute demands "-a" before:
+
+    query="Tbilisi, Georgia"
+
+    price_min=200
+    room_types="Entire home/apt", or "Private room",   (comma is needed at the end of the line)
+    min_bedrooms=2
+    min_beds=1
+    date_picker_type=flexible_dates or monthly_stay or calendar
+
+    if "monthly_stay":
+    monthly_start_date=2023-09-04
+    monthly_length=4
+
+    if "calendar":
+    checkin=2023-09-04
+    checkout=2023-09-10
+
+    # if "flexible_dates":
+    # flexible_trip_dates=september, october, (comma is needed at the end of the line)
+    # flexible_trip_lengths=one_month or one_week or weekend_trip, (comma is needed at the end of the line)
+    """
     name = "offers"
-    price_max = "&price_max=400"
-    start_urls = [
-        "https://www.airbnb.com/s/Tbilisi--Georgia/homes?tab_id=home_tab&refinement_paths%5B%5D=%2Fhomes&monthly_start_date=2023-09-01&monthly_length=3&price_filter_input_type=0&price_filter_num_nights=5&channel=EXPLORE&query=Tbilisi%2C%20Georgia&date_picker_type=flexible_dates&flexible_trip_lengths%5B%5D=one_month&flexible_trip_dates%5B%5D=september&adults=0" + price_max]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.start_urls = [self.__full(kwargs)]
 
     def parse(self, response: Response):
+        self.logger.info(response.url)
         script: str = response.css("script#data-deferred-state::text").get()
         data: dict = json.loads(script).get("niobeMinimalClientData")[0][
             1].get("data")
-        result: list = data["presentation"]["explore"]["sections"]["sectionIndependentData"]["staysSearch"]["searchResults"]
+        result: list = \
+        data["presentation"]["explore"]["sections"]["sectionIndependentData"][
+            "staysSearch"]["searchResults"]
 
         gen_pagination: Generator = self.__gen_dict_extract("nextPageCursor",
                                                             data)
@@ -39,6 +64,8 @@ class OffersSpider(scrapy.Spider):
             listening = room.get("listing")
             if listening:
                 item["id"] = listening.get("id")
+                item["name"] = listening.get("name", None)
+                item["type"] = listening.get("roomTypeCategory")
                 try:
                     match = re.match(r"^(.*) \((.*)\)",
                                      listening.get("avgRatingLocalized"))
@@ -47,7 +74,7 @@ class OffersSpider(scrapy.Spider):
                 except (TypeError, AttributeError):
                     pass
             else:
-                break
+                continue
 
             params = room.get("listingParamOverrides")
             if params:
@@ -64,7 +91,6 @@ class OffersSpider(scrapy.Spider):
                     break
                 except StopIteration:
                     continue
-
             yield item
 
     def __gen_dict_extract(self, key: str, var: dict):
@@ -79,3 +105,26 @@ class OffersSpider(scrapy.Spider):
                     for d in v:
                         for result in self.__gen_dict_extract(key, d):
                             yield result
+
+    def __full(self, kwargs):
+        kwargs = self.__transform_dictionary(kwargs)
+        print(kwargs)
+        init = "https://airbnb.com/s/any/homes?"
+        params = urllib.parse.urlencode(kwargs, doseq=True)
+        return init + params
+
+    def __transform_dictionary(self, input_dict):
+        transformed_dict = {}
+
+        for key, value in input_dict.items():
+            if key == 'query':
+                transformed_dict[key] = value
+            elif ',' in value:
+                items = [item.strip() for item in value.split(',') if
+                         item.strip() != '']
+                transformed_dict[key + '[]'] = items if len(items) > 1 else \
+                items[0]
+            else:
+                transformed_dict[key] = value
+
+        return transformed_dict
