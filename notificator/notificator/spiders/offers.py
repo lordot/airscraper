@@ -3,21 +3,21 @@ import re
 import urllib.parse
 from typing import Generator
 
-import scrapy
 from scrapy import Request, Spider
 from scrapy.http import Response
 
 from notificator.items import RoomItem
 
 
-class OffersSpider(scrapy.Spider):
+class OffersSpider(Spider):
     """
-    Each attribute demands "-a" before:
+    Each argument demands "-a" before:
 
     query="Tbilisi, Georgia"
 
     price_min=200
-    room_types="Entire home/apt", or "Private room",   (comma is needed at the end of the line)
+    room_types="Entire home/apt", or "Private room",
+                                    (comma is needed at the end of the line)
     min_bedrooms=2
     min_beds=1
     date_picker_type=flexible_dates or monthly_stay or calendar
@@ -31,8 +31,10 @@ class OffersSpider(scrapy.Spider):
     checkout=2023-09-10
 
     # if "flexible_dates":
-    # flexible_trip_dates=september, october, (comma is needed at the end of the line)
-    # flexible_trip_lengths=one_month or one_week or weekend_trip, (comma is needed at the end of the line)
+    # flexible_trip_dates=september, october,
+                                    (comma is needed at the end of the line)
+    # flexible_trip_lengths=one_month or one_week or weekend_trip,
+                                    (comma is needed at the end of the line)
     """
     name = "offers"
 
@@ -43,11 +45,13 @@ class OffersSpider(scrapy.Spider):
     def parse(self, response: Response):
         self.logger.info(response.url)
         script: str = response.css("script#data-deferred-state::text").get()
-        data: dict = json.loads(script).get("niobeMinimalClientData")[0][
-            1].get("data")
-        result: list = \
-        data["presentation"]["explore"]["sections"]["sectionIndependentData"][
-            "staysSearch"]["searchResults"]
+        data: dict = json.loads(script).get(
+            "niobeMinimalClientData"
+        )[0][1].get("data")
+        result: list = (
+            data["presentation"]["explore"]["sections"]
+            ["sectionIndependentData"]["staysSearch"]["searchResults"]
+        )
 
         gen_pagination: Generator = self.__gen_dict_extract("nextPageCursor",
                                                             data)
@@ -114,17 +118,16 @@ class OffersSpider(scrapy.Spider):
         return init + params
 
     def __transform_dictionary(self, input_dict):
-        transformed_dict = {}
+        transform = {}
 
         for key, value in input_dict.items():
             if key == 'query':
-                transformed_dict[key] = value
+                transform[key] = value
             elif ',' in value:
                 items = [item.strip() for item in value.split(',') if
                          item.strip() != '']
-                transformed_dict[key + '[]'] = items if len(items) > 1 else \
-                items[0]
+                transform[key + '[]'] = items if len(items) > 1 else items[0]
             else:
-                transformed_dict[key] = value
+                transform[key] = value
 
-        return transformed_dict
+        return transform
