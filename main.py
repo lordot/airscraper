@@ -36,6 +36,8 @@ def submit():
 
 @app.route("/scrape")
 def scrape():
+    output_data.clear()
+
     scrape_with_crochet(ARGS)
 
     time.sleep(20)
