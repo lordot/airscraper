@@ -3,10 +3,21 @@ import re
 import urllib.parse
 from typing import Generator
 
+import scrapy
+from scrapy import Field
 from scrapy import Request, Spider
 from scrapy.http import Response
 
-from notificator.items import RoomItem
+
+class RoomItem(scrapy.Item):
+    id = Field(serializer=int)
+    name = Field()
+    type = Field()
+    rate = Field(serializer=float)
+    reviews = Field(serializer=int)
+    price = Field()
+    checkin = Field()
+    checkout = Field()
 
 
 class OffersSpider(Spider):
@@ -40,6 +51,7 @@ class OffersSpider(Spider):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # if kwargs.get("query"):
         self.start_urls = [self.__full(kwargs)]
 
     def parse(self, response: Response):
@@ -67,7 +79,7 @@ class OffersSpider(Spider):
 
             listening = room.get("listing")
             if listening:
-                item["id"] = listening.get("id")
+                item["id"] = int(listening.get("id"))
                 item["name"] = listening.get("name", None)
                 item["type"] = listening.get("roomTypeCategory")
                 try:
@@ -97,7 +109,7 @@ class OffersSpider(Spider):
                     continue
             yield item
 
-    def __gen_dict_extract(self, key: str, var: dict):
+    def __gen_dict_extract(self, key: str, var: dict):  # TODO а оно нужно?
         if hasattr(var, 'items'):
             for k, v in var.items():
                 if k == key:
@@ -112,9 +124,9 @@ class OffersSpider(Spider):
 
     def __full(self, kwargs):
         kwargs = self.__transform_dictionary(kwargs)
-        print(kwargs)
         init = "https://airbnb.com/s/any/homes?"
         params = urllib.parse.urlencode(kwargs, doseq=True)
+        print(init + params)
         return init + params
 
     def __transform_dictionary(self, input_dict):
@@ -122,12 +134,15 @@ class OffersSpider(Spider):
 
         for key, value in input_dict.items():
             if key == 'query':
-                transform[key] = value
-            elif ',' in value:
+                transform[key] = str(value)
+            elif value is None:
+                continue
+            elif ',' in str(value):
                 items = [item.strip() for item in value.split(',') if
                          item.strip() != '']
-                transform[key + '[]'] = items if len(items) > 1 else items[0]
+                transform[key + '[]'] = [str(item) for item in items] if len(
+                    items) > 1 else str(items[0])
             else:
-                transform[key] = value
+                transform[key] = str(value)
 
         return transform
